@@ -5,6 +5,7 @@ from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, Vide
 import yt_dlp
 import whisper
 import re
+import textwrap
 
 # defining a function that takes video id and returns cleaned transcript
 def fetch_transcript(api, video_id):
@@ -15,10 +16,10 @@ def fetch_transcript(api, video_id):
         lines.append(snippet.text.replace("\n", " "))
             
     clean_transcript = " ".join(lines)
-
+    clean_transcript = textwrap.fill(clean_transcript, width=80)
     return clean_transcript
 
-def build_finished_transcript(clean_transcript, url):
+def build_finished_transcript(clean_transcript, url):   
     today = date.today()
     word_count = len(clean_transcript.split())
 
@@ -87,8 +88,8 @@ def main():
     video_id = parts[1]
     video_id = video_id.split("&")[0]
 
-    title = fetch_video_title(video_id)
-    clean_title = re.sub(r'[^\w]', '_', title)
+    title = fetch_video_title(video_id)         # Fetch video title
+    clean_title = re.sub(r'[^\w]', '_', title)  # make filename safe by removing dangerous characters
 
     os.makedirs("transcripts", exist_ok=True) # make a directory called 'transcripts', only if it does not already exist
     filename = os.path.join("transcripts", f"{clean_title}_{video_id}.txt") # Build the file path
