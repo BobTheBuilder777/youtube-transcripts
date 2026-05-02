@@ -4,6 +4,7 @@ import os
 from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, VideoUnavailable, TranscriptsDisabled
 import yt_dlp
 import whisper
+import re
 
 # defining a function that takes video id and returns cleaned transcript
 def fetch_transcript(api, video_id):
@@ -18,52 +19,62 @@ def fetch_transcript(api, video_id):
     return clean_transcript
 
 def build_finished_transcript(clean_transcript, url):
+    today = date.today()
     word_count = len(clean_transcript.split())
 
     adult_reading_time = 200 #words per minute
     reading_time = round(word_count/adult_reading_time)
 
-    header = f"Video URL: {url}\nWord count: {word_count}\nEstimated Reading Time: {reading_time} minutes\n"
+    header = f"Date fetched: {today}\nVideo URL: {url}\nWord count: {word_count}\nEstimated Reading Time: {reading_time} minutes\n"
     finished_transcript = header + clean_transcript
 
     return finished_transcript, word_count, reading_time
 
 
 def save_transcript(finished_transcript, filename):
-    if not os.path.exists(filename):
-        with open(filename, "w") as f:
-            f.write(finished_transcript)
-        print(f"Saved to {filename}")
-    else:
-        print(f"File already exist at {filename}")
+    with open(filename, "w") as f:
+        f.write(finished_transcript)
+    print(f"Saved to {filename}")
+
 
 def transcribe_with_whisper(video_id):
     url = f"https://www.youtube.com/watch?v={video_id}"
     audio_filename =f"{video_id}"
     audio_path = f"{audio_filename}.mp3"
     ydl_opts = {
-        "format": "bestaudio/best",     # download the best quality audio available
-        "outtmpl": audio_filename,      # save with out chosen filename
-        "postprocessors": [{            # convert to mp3 after download
+        "format": "bestaudio/best",             # download the best quality audio available
+        "outtmpl": audio_filename,              # save with out chosen filename
+        "postprocessors": [{                    # convert to mp3 after download
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
         }],
-        "quiet": True                 # suppress yt-dlp's own output
+        "quiet": True,                          # suppress yt-dlp's own output
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
     model = whisper.load_model("base")          # Loads whisper AI model into memory
-    result = model.transcribe(audio_path)   # Runs the audio file through the model
+    result = model.transcribe(audio_path)       # Runs the audio file through the model
     clean_transcript = result["text"]           # Extracts just the text from the result dictionary
 
     os.remove(audio_path)
     return clean_transcript
 
+def fetch_video_title(video_id):        # Function to fetch video title from metadata
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    ydl_opts = {
+        "skip_download" : True,         # Don't download anything
+        "quiet": True                   # Suppress output
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url)
+
+    return info["title"]
+
 def main():
     # setup
-    today = date.today()
     url = input("Input video URL: ")
 
     # validation
@@ -76,18 +87,22 @@ def main():
     video_id = parts[1]
     video_id = video_id.split("&")[0]
 
+    title = fetch_video_title(video_id)
+    clean_title = re.sub(r'[^\w]', '_', title)
+
     os.makedirs("transcripts", exist_ok=True) # make a directory called 'transcripts', only if it does not already exist
-    filename = os.path.join("transcripts", f"{video_id}_{today}.txt") # Build the file path
+    filename = os.path.join("transcripts", f"{clean_title}_{video_id}.txt") # Build the file path
+
+    if os.path.exists(filename):
+        print(f"Transcript already exists at {filename}")
+        return
 
     api = YouTubeTranscriptApi() # instantiate an instance of the YoutubeTranscriptApi class
 
     try:
         clean_transcript = fetch_transcript(api, video_id) # call the fetch_trancript() function
         
-    except NoTranscriptFound:
-        clean_transcript = transcribe_with_whisper(video_id)    
-
-    except TranscriptsDisabled:
+    except (NoTranscriptFound, TranscriptsDisabled):
         clean_transcript = transcribe_with_whisper(video_id)    
 
     except VideoUnavailable:
