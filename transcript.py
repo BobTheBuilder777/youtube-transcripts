@@ -2,10 +2,14 @@ from datetime import date
 import os
 
 from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, VideoUnavailable, TranscriptsDisabled
+from dotenv import load_dotenv
+from openai import OpenAI
 import yt_dlp
 import whisper
 import re
 import textwrap
+
+load_dotenv()
 
 # defining a function that takes video id and returns cleaned transcript
 def fetch_transcript(api, video_id):
@@ -19,7 +23,7 @@ def fetch_transcript(api, video_id):
     clean_transcript = textwrap.fill(clean_transcript, width=80)
     return clean_transcript
 
-def build_finished_transcript(clean_transcript, url):   
+def build_finished_transcript(clean_transcript, url):       
     today = date.today()
     word_count = len(clean_transcript.split())
 
@@ -74,6 +78,28 @@ def fetch_video_title(video_id):        # Function to fetch video title from met
 
     return info["title"]
 
+def summarize_transcript(clean_transcript):
+    client = OpenAI (
+        api_key=os.getenv("DEEPSEEK_API_KEY"),
+        base_url="https://api.deepseek.com"
+    )
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[
+            {"role":"system", "content": """You are a helpful assistant that summarises video transcripts. 
+            If the content is educational or informational, produce a structured summary with these sections:
+            - Overview: a 2-3 sentence summary of the video
+            - Key Concepts: important terms and definitions as bullet points
+            - Main Points: the core ideas and arguments as bullet points
+            - Takeaways: actionable insights or things to remember as bullet points
+
+            If the content is music, poetry, or non-informational, provide a brief 1-2 sentence description of what it is instead."""},
+            
+            {"role":"user", "content": f"Please summarize this transcript:\n\n{clean_transcript}"}
+        ]
+    )
+    return response.choices[0].message.content
+
 def main():
     # setup
     url = input("Input video URL: ")
@@ -112,6 +138,20 @@ def main():
 
     finished_transcript, word_count, reading_time = build_finished_transcript(clean_transcript, url) # call the build_finished_transcript() function
     save_transcript(finished_transcript, filename)
+
+    # Generate AI summary through deepseek API
+    try:
+        summary = summarize_transcript(clean_transcript)
+        paragraphs = summary.split("\n\n")
+        wrapped_paragraphs = [textwrap.fill(p, width=80) for p in paragraphs]
+        summary = "\n\n".join(wrapped_paragraphs)
+        with open(filename, "a") as f:
+            f.write(f"\n\n--- AI SUMMARY ---\n\n {summary}")
+
+    except Exception as e:
+        print(f"Summary could not be generated: {e}")
+
+
     print(f"Transcript fetched!\nVideo URL:{url}\nWord count:{word_count}\nReading Time:{reading_time}\nSaved to {filename}")
 
 if __name__ == "__main__":
