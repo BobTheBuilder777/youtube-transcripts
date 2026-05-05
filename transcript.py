@@ -100,7 +100,7 @@ def summarize_transcript(clean_transcript, model="deepseek-v4-pro"):
     )
     return response.choices[0].message.content
 
-def main():
+def main(format="md"):
     # setup
     url = input("Input video URL: ")
 
@@ -118,7 +118,7 @@ def main():
     clean_title = re.sub(r'[^\w]', '_', title)  # make filename safe by removing dangerous characters
 
     os.makedirs("transcripts", exist_ok=True) # make a directory called 'transcripts', only if it does not already exist
-    filename = os.path.join("transcripts", f"{clean_title}_{video_id}.md") # Build the file path
+    filename = os.path.join("transcripts", f"{clean_title}_{video_id}.{format}") # Build the file path
 
     if os.path.exists(filename):
         print(f"Transcript already exists at {filename}")
