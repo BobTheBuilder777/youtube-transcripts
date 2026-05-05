@@ -20,17 +20,17 @@ def fetch_transcript(api, video_id):
         lines.append(snippet.text.replace("\n", " "))
             
     clean_transcript = " ".join(lines)
-    clean_transcript = textwrap.fill(clean_transcript, width=80)
+    clean_transcript = textwrap.fill(clean_transcript, width=120)
     return clean_transcript
 
-def build_finished_transcript(clean_transcript, url):       
+def build_finished_transcript(clean_transcript, url, uploader, title):       
     today = date.today()
     word_count = len(clean_transcript.split())
 
     adult_reading_time = 200 #words per minute
     reading_time = round(word_count/adult_reading_time)
 
-    header = f"Date fetched: {today}\nVideo URL: {url}\nWord count: {word_count}\nEstimated Reading Time: {reading_time} minutes\n"
+    header = f"Date fetched: {today}\nVideo URL: {url}\nTitle: {title}\nUploader: {uploader}\nWord count: {word_count}\nEstimated Reading Time: {reading_time} minutes\n"
     finished_transcript = header + clean_transcript
 
     return finished_transcript, word_count, reading_time
@@ -66,7 +66,7 @@ def transcribe_with_whisper(video_id):
     os.remove(audio_path)
     return clean_transcript
 
-def fetch_video_title(video_id):        # Function to fetch video title from metadata
+def fetch_metadata(video_id):        # Function to fetch video title from metadata
     url = f"https://www.youtube.com/watch?v={video_id}"
     ydl_opts = {
         "skip_download" : True,         # Don't download anything
@@ -76,15 +76,15 @@ def fetch_video_title(video_id):        # Function to fetch video title from met
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url)
 
-    return info["title"]
+    return info["title"],info["uploader"]
 
-def summarize_transcript(clean_transcript):
+def summarize_transcript(clean_transcript, model="deepseek-v4-pro"):
     client = OpenAI (
         api_key=os.getenv("DEEPSEEK_API_KEY"),
         base_url="https://api.deepseek.com"
     )
     response = client.chat.completions.create(
-        model="deepseek-chat",
+        model=model,
         messages=[
             {"role":"system", "content": """You are a helpful assistant that summarises video transcripts. 
             If the content is educational or informational, produce a structured summary with these sections:
@@ -94,7 +94,7 @@ def summarize_transcript(clean_transcript):
             - Takeaways: actionable insights or things to remember as bullet points
 
             If the content is music, poetry, or non-informational, provide a brief 1-2 sentence description of what it is instead."""},
-            
+
             {"role":"user", "content": f"Please summarize this transcript:\n\n{clean_transcript}"}
         ]
     )
@@ -114,11 +114,11 @@ def main():
     video_id = parts[1]
     video_id = video_id.split("&")[0]
 
-    title = fetch_video_title(video_id)         # Fetch video title
+    title, uploader = fetch_metadata(video_id)         # Fetch video title
     clean_title = re.sub(r'[^\w]', '_', title)  # make filename safe by removing dangerous characters
 
     os.makedirs("transcripts", exist_ok=True) # make a directory called 'transcripts', only if it does not already exist
-    filename = os.path.join("transcripts", f"{clean_title}_{video_id}.txt") # Build the file path
+    filename = os.path.join("transcripts", f"{clean_title}_{video_id}.md") # Build the file path
 
     if os.path.exists(filename):
         print(f"Transcript already exists at {filename}")
@@ -136,14 +136,14 @@ def main():
         print(f"This video is unavailable or does not exist")
         return
 
-    finished_transcript, word_count, reading_time = build_finished_transcript(clean_transcript, url) # call the build_finished_transcript() function
+    finished_transcript, word_count, reading_time = build_finished_transcript(clean_transcript, url, uploader, title) # call the build_finished_transcript() function
     save_transcript(finished_transcript, filename)
 
     # Generate AI summary through deepseek API
     try:
         summary = summarize_transcript(clean_transcript)
         paragraphs = summary.split("\n\n")
-        wrapped_paragraphs = [textwrap.fill(p, width=80) for p in paragraphs]
+        wrapped_paragraphs = [textwrap.fill(p, width=100) for p in paragraphs]
         summary = "\n\n".join(wrapped_paragraphs)
         with open(filename, "a") as f:
             f.write(f"\n\n--- AI SUMMARY ---\n\n {summary}")
