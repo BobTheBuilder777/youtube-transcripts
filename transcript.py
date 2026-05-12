@@ -66,7 +66,7 @@ def transcribe_with_whisper(video_id):
     os.remove(audio_path)
     return clean_transcript
 
-def fetch_metadata(video_id):        # Function to fetch video title from metadata
+def fetch_metadata(video_id):           # Function to fetch video title from metadata
     url = f"https://www.youtube.com/watch?v={video_id}"
     ydl_opts = {
         "skip_download" : True,         # Don't download anything
