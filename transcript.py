@@ -23,18 +23,23 @@ def fetch_transcript(api, video_id):
     clean_transcript = textwrap.fill(clean_transcript, width=120)
     return clean_transcript
 
-def build_finished_transcript(clean_transcript, url, uploader, title):       
-    today = date.today()
+def calculate_stats(clean_transcript):
     word_count = len(clean_transcript.split())
-
     adult_reading_time = 200 #words per minute
     reading_time = round(word_count/adult_reading_time)
+    
+    return word_count, reading_time
 
+def build_finished_transcript(clean_transcript, url, uploader, title):       
+    today = date.today()
+    word_count, reading_time = calculate_stats(clean_transcript)
     header = f"Date fetched: {today}\nVideo URL: {url}\nTitle: {title}\nUploader: {uploader}\nWord count: {word_count}\nEstimated Reading Time: {reading_time} minutes\n"
     finished_transcript = header + clean_transcript
 
     return finished_transcript, word_count, reading_time
 
+def clean_filename(title):
+    return re.sub(r'[^\w]', '_', title)
 
 def save_transcript(finished_transcript, filename):
     with open(filename, "w") as f:
@@ -115,7 +120,7 @@ def main(format="md"):
     video_id = video_id.split("&")[0]
 
     title, uploader = fetch_metadata(video_id)         # Fetch video title
-    clean_title = re.sub(r'[^\w]', '_', title)  # make filename safe by removing dangerous characters
+    clean_title = clean_filename(title)  # make filename safe by removing dangerous characters
 
     os.makedirs("transcripts", exist_ok=True) # make a directory called 'transcripts', only if it does not already exist
     filename = os.path.join("transcripts", f"{clean_title}_{video_id}.{format}") # Build the file path
