@@ -103,9 +103,9 @@ def summarize_transcript(clean_transcript, model="deepseek-v4-flash"):
             {"role":"user", "content": f"Please summarize this transcript:\n\n{clean_transcript}"}
         ]
     )
-    return response.choices[0].message.content
+    return response.choices[0].message.content, model
 
-def main(format="md"):
+def main(output_format="md"):
     # setup
     url = input("Input video URL: ")
 
@@ -123,7 +123,7 @@ def main(format="md"):
     clean_title = clean_filename(title)                # make filename safe by removing dangerous characters
 
     os.makedirs("transcripts", exist_ok=True)           # make a directory called 'transcripts', only if it does not already exist
-    filename = os.path.join("transcripts", f"{clean_title}_{video_id}.{format}") # Build the file path
+    filename = os.path.join("transcripts", f"{clean_title}_{video_id}.{output_format}") # Build the file path
 
     if os.path.exists(filename):
         print(f"Transcript already exists at {filename}")
@@ -146,16 +146,15 @@ def main(format="md"):
 
     # Generate AI summary through deepseek API
     try:
-        summary = summarize_transcript(clean_transcript)
+        summary, model = summarize_transcript(clean_transcript)
         paragraphs = summary.split("\n\n")
         wrapped_paragraphs = [textwrap.fill(p, width=100) for p in paragraphs]
         summary = "\n\n".join(wrapped_paragraphs)
         with open(filename, "a") as f:
-            f.write(f"\n\n--- AI SUMMARY ---\n\n {summary}")
+            f.write(f"\n\nModel: {model}\n--- AI SUMMARY ---\n\n {summary}")
 
     except Exception as e:
         print(f"Summary could not be generated: {e}")
-
 
     print(f"Transcript fetched!\nVideo URL:{url}\nWord count:{word_count}\nReading Time:{reading_time}\nSaved to {filename}")
 
