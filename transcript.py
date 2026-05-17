@@ -83,7 +83,7 @@ def fetch_metadata(video_id):           # Function to fetch video title from met
 
     return info["title"],info["uploader"]
 
-def summarize_transcript(clean_transcript, model="deepseek-v4-pro"):
+def summarize_transcript(clean_transcript, model="deepseek-v4-flash"):
     client = OpenAI (
         api_key=os.getenv("DEEPSEEK_API_KEY"),
         base_url="https://api.deepseek.com"
@@ -120,9 +120,9 @@ def main(format="md"):
     video_id = video_id.split("&")[0]
 
     title, uploader = fetch_metadata(video_id)         # Fetch video title
-    clean_title = clean_filename(title)  # make filename safe by removing dangerous characters
+    clean_title = clean_filename(title)                # make filename safe by removing dangerous characters
 
-    os.makedirs("transcripts", exist_ok=True) # make a directory called 'transcripts', only if it does not already exist
+    os.makedirs("transcripts", exist_ok=True)           # make a directory called 'transcripts', only if it does not already exist
     filename = os.path.join("transcripts", f"{clean_title}_{video_id}.{format}") # Build the file path
 
     if os.path.exists(filename):
